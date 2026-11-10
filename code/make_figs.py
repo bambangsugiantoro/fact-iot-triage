@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 
 S = pd.read_csv(sys.argv[1])
 R = pd.read_csv(sys.argv[2])
@@ -50,7 +51,7 @@ fig.savefig(f"{out}/fig_series.pdf")
 plt.close(fig)
 
 # worst-class coverage and decision error across all eight cells
-M = R[(R.tag == "v2") | ((R.tag == "g") & (R.method == "FACT-G (rare-class guard)"))] if "tag" in R else R
+M = R[(R.tag == "v2") | ((R.tag == "g2") & (R.method == "FACT-G (rare-class guard)"))] if "tag" in R else R
 order = [("ciciot2023", "novel"), ("ciciot2023", "capture"), ("ciciot2023", "prior"), ("nf_ton_v2", "novel"),
          ("nf_ton_v2", "prior"), ("edgeiiot", "novel"), ("edgeiiot", "prior"), ("iot23", "capture")]
 names = ["CIC\nnovel", "CIC\ncapture", "CIC\nbursts", "ToN\nnovel", "ToN\nbursts", "Edge\nnovel", "Edge\nbursts",
@@ -93,9 +94,10 @@ if len(sys.argv) > 4 and os.path.exists(sys.argv[4]):
     grids = [("capacity $\\kappa$", {"cap0.02": 0.02, "cap0.05": 0.05, "": 0.10, "cap0.2": 0.20}),
              ("audit rate $\\varepsilon$", {"eps0.005": 0.005, "eps0.01": 0.01, "": 0.02, "eps0.05": 0.05}),
              ("label delay (batches)", {"delay1": 1, "": 5, "delay20": 20}),
-             ("analyst label noise", {"": 0.0, "noise0.05": 0.05, "noise0.1": 0.10})]
+             ("analyst label noise", {"": 0.0, "noise0.05": 0.05, "noise0.1": 0.10}),
+             ("step size $\\gamma$", {"gam0.01": 0.01, "": 0.05, "gam0.2": 0.2})]
     cells3 = [("ciciot2023", "novel", "CIC novel"), ("iot23", "capture", "IoT-23"), ("nf_ton_v2", "novel", "ToN novel")]
-    fig, ax = plt.subplots(2, 4, figsize=(7.0, 3.6))
+    fig, ax = plt.subplots(2, 5, figsize=(7.0, 3.4))
     for gi, (xl, mp) in enumerate(grids):
         for (d, sc, lab), col in zip(cells3, ["#0072B2", "#D55E00", "#009E73"]):
             for row, key in enumerate(["worst_class_cov", "e2e_error"]):
@@ -103,15 +105,21 @@ if len(sys.argv) > 4 and os.path.exists(sys.argv[4]):
                 for t, xval in mp.items():
                     g = Z[(Z.dataset == d) & (Z.scenario == sc) & (Z.base == t) & (Z.method == "FACT (proposed)")]
                     if t == "":
-                        g = Z[(Z.dataset == d) & (Z.scenario == sc) & (Z.tag == "v2") & (Z.method == "FACT (proposed)")]
+                        g = Z[(Z.dataset == d) & (Z.scenario == sc) & (Z.tag == "v2") & (Z.method == "FACT (proposed)")
+                              & (Z.seed < 3)]
                     if len(g):
                         xv.append(xval)
                         yv.append(g[key].mean())
                 ax[row, gi].plot(xv, yv, marker="o", ms=3, lw=1.2, color=col, label=lab)
         ax[1, gi].set_xlabel(xl)
-        if gi in (0, 1):
-            for r_ in (0, 1):
+        ticks = sorted(mp.values())
+        for r_ in (0, 1):
+            if gi in (0, 1, 4):
                 ax[r_, gi].set_xscale("log")
+            ax[r_, gi].xaxis.set_minor_locator(matplotlib.ticker.NullLocator())
+            ax[r_, gi].set_xticks(ticks)
+            ax[r_, gi].set_xticklabels([("%g" % (100 * t) + "%") if gi in (0, 1) else "%g" % t for t in ticks],
+                                       fontsize=6.5, rotation=0)
     ax[0, 0].set_ylabel("worst-class coverage")
     ax[1, 0].set_ylabel("decision error")
     for a in ax[0]:
